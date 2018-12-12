@@ -9,19 +9,10 @@ namespace TeleprompterConsole
     {
         static void Main(string[] args)
         {
-            var lines = ReadFrom("sampleQuotes.txt");
-            foreach (var line in lines)
-            {
-                Console.Write(line);
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    var pause = Task.Delay(200);
-                    pause.Wait();
-                }
-            }
+            RunTeleprompter().Wait();
         }
 
-        private static async Task ShowTeleprompter()
+        private static async Task ShowTeleprompter(TeleprompterConfig config)
         {
             var words = ReadFrom("sampleQuotes.txt");
             foreach (var word in words)
@@ -29,9 +20,43 @@ namespace TeleprompterConsole
                 Console.Write(word);
                 if (!string.IsNullOrWhiteSpace(word))
                 {
-                    await Task.Delay(200);
+                    await Task.Delay(config.DelayInMilliSeconds);
                 }
             }
+            config.SetDone();
+        }
+
+        private static async Task GetInput(TeleprompterConfig config)
+        {
+            Action work = () =>
+            {
+                do
+                {
+                    var key = Console.ReadKey(true);
+                    if (key.KeyChar == '>')
+                    {
+                        config.UpdateDelay(-10);
+                    }
+                    else if (key.KeyChar == '<')
+                    {
+                        config.UpdateDelay(10);
+                    }
+                    else if (key.KeyChar == 'X' || key.KeyChar == 'x')
+                    {
+                        config.SetDone();
+                    }
+                } while (!config.Done);
+            };
+            await Task.Run(work);
+        }
+
+        private static async Task RunTeleprompter()
+        {
+            var config = new TeleprompterConfig();
+            var displayTask = ShowTeleprompter(config);
+
+            var speedTask = GetInput(config);
+            await Task.WhenAny(displayTask, speedTask);
         }
 
         static IEnumerable<string> ReadFrom(string file)
